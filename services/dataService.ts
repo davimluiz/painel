@@ -1,26 +1,22 @@
-import { ClassInfo, MediaInfo } from '../types';
+import { ClassInfo, MediaInfo, MediaType } from '../types';
 
-// This is mock data. In a real application, you would fetch this from a URL.
-const MOCK_CSV_DATA = `sala,turma,instrutor,unidade_curricular,inicio,fim
-Laboratório 01,Téc. em Redes,João Silva,Segurança de Redes,08:00,10:00
-Oficina Mecânica,Mecânica Automotiva,Carlos Pereira,Sistemas de Freios,08:00,12:00
-Sala 10,Design Gráfico,Ana Costa,Teoria das Cores,10:00,12:00
-Laboratório 03,Desenvolvimento Web,Mariana Lima,React Avançado,13:30,15:30
-Estúdio de Foto,Fotografia Digital,Ricardo Alves,Iluminação de Estúdio,13:30,17:30
-Sala 05,Téc. em Edificações,Fernanda Souza,Desenho Técnico,15:30,17:30
-Laboratório 02,Ciência de Dados,Pedro Martins,Machine Learning,19:00,21:00
-Sala 12,Gestão de Projetos,Camila Rocha,Metodologias Ágeis,19:00,22:00`;
+// Em uma aplicação real, você usaria variáveis de ambiente para estas URLs.
+// Ex: const CSV_URL = process.env.BLOB_CSV_URL;
+const CSV_URL = 'https://gist.githubusercontent.com/adrianosferreira/0978c7c1339c33be32c69435b67d56a7/raw/a08b33539b7d5668e27c1973f73c65c2f7823e20/classes_data.csv';
 
-// In a real application, you would use this variable from your environment.
-// const CSV_URL = process.env.BLOB_CSV_URL;
+// A URL da mídia também viria de uma variável de ambiente.
+// Pode ser uma imagem ou um vídeo.
+const MEDIA_URL = 'https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4'; 
 
 const parseCSV = (csvText: string): ClassInfo[] => {
   const lines = csvText.trim().split('\n');
+  if (lines.length <= 1) return [];
+
   const headers = lines[0].split(',').map(h => h.trim());
   const data = lines.slice(1).map(line => {
     const values = line.split(',');
     const entry = headers.reduce((obj, header, index) => {
-      obj[header as keyof ClassInfo] = values[index].trim();
+      obj[header as keyof ClassInfo] = values[index]?.trim() || '';
       return obj;
     }, {} as Partial<ClassInfo>);
     return entry as ClassInfo;
@@ -29,42 +25,70 @@ const parseCSV = (csvText: string): ClassInfo[] => {
 };
 
 export const fetchClassData = async (): Promise<ClassInfo[]> => {
-  console.log("Fetching class data...");
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        // In a real app:
-        // const response = await fetch(CSV_URL);
-        // if (!response.ok) throw new Error('Network response was not ok');
-        // const csvText = await response.text();
-        // resolve(parseCSV(csvText));
-        
-        // Using mock data:
-        if (Math.random() > 0.9) { // Simulate a fetch error occasionally
-             reject(new Error("Não foi possível carregar o arquivo CSV."));
-        } else {
-            const data = parseCSV(MOCK_CSV_DATA);
-            resolve(data);
-        }
-      } catch (error) {
-        reject(error);
-      }
-    }, 1500); // Simulate network delay
-  });
+  console.log("Buscando dados das aulas do Vercel Blob...");
+  if (!CSV_URL) {
+      throw new Error("A URL do CSV (BLOB_CSV_URL) não está configurada.");
+  }
+  
+  try {
+    const response = await fetch(CSV_URL);
+    if (!response.ok) {
+      throw new Error(`A resposta da rede não foi 'ok'. Status: ${response.status}`);
+    }
+    const csvText = await response.text();
+    return parseCSV(csvText);
+  } catch (error) {
+    console.error("Erro ao buscar dados das aulas:", error);
+    throw new Error("Não foi possível carregar o arquivo CSV.");
+  }
 };
 
+const getMediaTypeFromUrl = (url: string): MediaType | null => {
+    if (!url) return null;
+    // Remove query parameters before getting the extension
+    const extension = url.split('.').pop()?.split('?')[0].toLowerCase();
+    if (!extension) return null;
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension)) {
+        return 'image';
+    }
+    if (['mp4', 'webm', 'ogg'].includes(extension)) {
+        return 'video';
+    }
+    return null;
+}
 
 export const fetchMediaData = async (): Promise<MediaInfo | null> => {
-    console.log("Fetching media data...");
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // Simulate fetching the latest media. Can be an image or video.
-            const mediaOptions: (MediaInfo | null)[] = [
-                { type: 'image', url: 'https://picsum.photos/seed/school/800/600', alt: 'Anúncio institucional' },
-                { type: 'video', url: 'https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4', alt: 'Vídeo institucional da escola' },
-                null, // Simulate no media available
-            ];
-            resolve(mediaOptions[Math.floor(Math.random() * mediaOptions.length)]);
-        }, 1800); // Simulate network delay
-    });
+    console.log("Buscando dados de mídia do Vercel Blob...");
+    if (!MEDIA_URL) {
+        console.log("Nenhuma URL de mídia (BLOB_MEDIA_URL) configurada.");
+        return null;
+    }
+
+    try {
+        // Usamos um request HEAD para verificar se a mídia existe sem baixá-la inteira.
+        const response = await fetch(MEDIA_URL, { method: 'HEAD' });
+        if (!response.ok) {
+            console.error(`Mídia não encontrada em ${MEDIA_URL}. Status: ${response.status}`);
+            return null;
+        }
+
+        const mediaType = getMediaTypeFromUrl(MEDIA_URL);
+
+        if (!mediaType) {
+            console.warn(`Não foi possível determinar o tipo de mídia para a URL: ${MEDIA_URL}`);
+            return null;
+        }
+
+        return {
+            type: mediaType,
+            url: MEDIA_URL,
+            alt: 'Mídia institucional',
+        };
+
+    } catch (error) {
+        console.error("Erro ao buscar dados da mídia:", error);
+        // Não bloqueia a UI se a mídia falhar ao carregar, apenas retorna nulo.
+        return null; 
+    }
 };
