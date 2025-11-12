@@ -1,0 +1,5 @@
+{
+  "name": "Painel de Aulas Dinâmico",
+  "description": "Um painel de visualização pública que exibe as aulas do dia e mídias institucionais, com dados carregados de uma fonte externa. O design é moderno, responsivo e otimizado para grandes telas, utilizando um tema escuro com glassmorphism.",
+  "requestFramePermissions": []
+}
